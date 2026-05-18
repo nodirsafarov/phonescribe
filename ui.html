@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PhoneScribe — orginfo phone scraper</title>
+<style>
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: #f6f7f9;
+    color: #111827;
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  header {
+    background: #111827;
+    color: #f9fafb;
+    padding: 14px 24px;
+    display: flex;
+    align-items: baseline;
+    gap: 16px;
+    flex-wrap: wrap;
+  }
+  header h1 { margin: 0; font-size: 16px; font-weight: 600; }
+  header .meta { font-size: 12px; opacity: 0.7; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  header .gem {
+    margin-left: auto;
+    font-size: 11px;
+    padding: 3px 10px;
+    border-radius: 999px;
+    background: #1f2937;
+  }
+  header .gem.on  { background: #064e3b; color: #6ee7b7; }
+  header .gem.off { background: #1f2937; color: #9ca3af; }
+
+  .container { max-width: 1280px; margin: 20px auto; padding: 0 24px; }
+
+  form.controls {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 18px;
+    display: grid;
+    grid-template-columns: minmax(220px, 2fr) 110px 110px auto auto;
+    gap: 12px;
+    align-items: end;
+    margin-bottom: 14px;
+  }
+  form.controls label {
+    display: block;
+    font-size: 11px;
+    font-weight: 600;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    margin-bottom: 4px;
+  }
+  form.controls select,
+  form.controls input {
+    width: 100%;
+    padding: 9px 12px;
+    border: 1px solid #d1d5db;
+    border-radius: 6px;
+    font-size: 14px;
+    font-family: inherit;
+    background: #fff;
+  }
+  form.controls select:focus, form.controls input:focus {
+    outline: none;
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+  }
+  form.controls button {
+    padding: 9px 18px;
+    border: 0;
+    border-radius: 6px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    font-family: inherit;
+  }
+  form.controls button:disabled { opacity: 0.5; cursor: not-allowed; }
+  button.dry   { background: #e5e7eb; color: #111827; }
+  button.dry:hover:not(:disabled)   { background: #d1d5db; }
+  button.write { background: #dc2626; color: #fff; }
+  button.write:hover:not(:disabled) { background: #b91c1c; }
+
+  .status {
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 10px 18px;
+    margin-bottom: 14px;
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    font-size: 13px;
+  }
+  .badge {
+    display: inline-block;
+    padding: 3px 12px;
+    border-radius: 999px;
+    font-weight: 600;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .badge.idle    { background: #f3f4f6; color: #6b7280; }
+  .badge.running { background: #dbeafe; color: #1e40af; }
+  .badge.done    { background: #d1fae5; color: #065f46; }
+  .badge.error   { background: #fee2e2; color: #991b1b; }
+  .status-text { color: #6b7280; }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    overflow: hidden;
+  }
+  thead th {
+    background: #f9fafb;
+    padding: 10px 14px;
+    text-align: left;
+    font-weight: 600;
+    font-size: 11px;
+    color: #6b7280;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid #e5e7eb;
+    white-space: nowrap;
+  }
+  tbody td {
+    padding: 10px 14px;
+    border-bottom: 1px solid #f3f4f6;
+    vertical-align: top;
+    font-size: 13px;
+  }
+  tbody tr:last-child td { border-bottom: 0; }
+  tbody tr:hover { background: #fafbfc; }
+  td.row-num { font-family: ui-monospace, monospace; color: #6b7280; width: 56px; }
+  td.phone   { font-family: ui-monospace, monospace; font-weight: 600; }
+  td.action  { white-space: nowrap; width: 220px; }
+  td.company .raw    { font-weight: 500; }
+  td.company .picked { font-size: 11px; color: #6b7280; margin-top: 2px; }
+  td.company .picked .inn { font-family: ui-monospace, monospace; color: #059669; margin-right: 6px; }
+
+  .action-tag {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 4px;
+    font-size: 11px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+  .action-tag.WRITTEN     { background: #d1fae5; color: #065f46; }
+  .action-tag.WOULD_WRITE { background: #fef3c7; color: #92400e; }
+  .action-tag.SKIPPED     { background: #f3f4f6; color: #6b7280; }
+  .action-tag.ERROR       { background: #fee2e2; color: #991b1b; }
+  .reason { display: block; margin-top: 3px; font-size: 11px; color: #9ca3af; }
+  .current-h { font-style: italic; color: #9ca3af; }
+
+  .summary {
+    display: none;
+    margin-top: 16px;
+    background: #fff;
+    border: 1px solid #e5e7eb;
+    border-radius: 8px;
+    padding: 16px 20px;
+  }
+  .summary.visible { display: block; }
+  .summary h3 { margin: 0 0 12px 0; font-size: 13px; color: #374151; }
+  .summary .grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: 10px;
+  }
+  .summary .stat { background: #f9fafb; padding: 10px 12px; border-radius: 6px; }
+  .summary .stat .num   { font-size: 22px; font-weight: 700; color: #111827; }
+  .summary .stat .label { font-size: 11px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.04em; margin-top: 2px; }
+
+  @media (max-width: 720px) {
+    form.controls { grid-template-columns: 1fr 1fr; }
+    form.controls button { grid-column: span 2; }
+    td.action { width: auto; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>PhoneScribe — orginfo phone scraper</h1>
+  <span class="meta">Sheet: {{.SpreadsheetID}}</span>
+  <span class="gem {{if .GeminiOn}}on{{else}}off{{end}}">
+    Gemini: {{if .GeminiOn}}ON{{else}}OFF{{end}}
+  </span>
+</header>
+
+<div class="container">
+
+  <form class="controls" id="runForm" onsubmit="return false;">
+    <div>
+      <label for="tab">Sheet tab</label>
+      <select id="tab" required></select>
+    </div>
+    <div>
+      <label for="from">From row</label>
+      <input id="from" type="number" min="2" value="2" required>
+    </div>
+    <div>
+      <label for="to">To row</label>
+      <input id="to" type="number" min="2" value="51" required>
+    </div>
+    <button type="button" class="dry"   id="dryBtn">Dry-run</button>
+    <button type="button" class="write" id="writeBtn">⚠ WRITE</button>
+  </form>
+
+  <div class="status">
+    <span class="badge idle" id="badge">idle</span>
+    <span class="status-text" id="statusText">Pick a tab and a row range, then click Dry-run.</span>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>Row</th>
+        <th>Company (E)</th>
+        <th>Phone</th>
+        <th>Action</th>
+      </tr>
+    </thead>
+    <tbody id="results"></tbody>
+  </table>
+
+  <div class="summary" id="summary">
+    <h3>Summary</h3>
+    <div class="grid" id="summaryGrid"></div>
+  </div>
+
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+
+const tabSel    = $('tab');
+const fromInput = $('from');
+const toInput   = $('to');
+const dryBtn    = $('dryBtn');
+const writeBtn  = $('writeBtn');
+const badge     = $('badge');
+const statusText= $('statusText');
+const results   = $('results');
+const summary   = $('summary');
+const summaryGrid = $('summaryGrid');
+
+let eventSource = null;
+let running = false;
+
+const REASON_LABEL = {
+  EMPTY_NAME:        'column E is empty',
+  H_NOT_EMPTY:       'column H already has a value',
+  NO_RESULTS:        'not found on orginfo',
+  ALL_LIQUIDATED:    'all matches are liquidated — no data',
+  NO_PHONE:          'active match found, but it has no phone',
+  EMPTY_AFTER_CLEAN: 'name is empty after normalization',
+};
+
+function escapeHtml(s) {
+  if (s == null) return '';
+  return String(s).replace(/[&<>"']/g, ch => ({
+    '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+  }[ch]));
+}
+
+function setBadge(state, text) {
+  badge.className = 'badge ' + state;
+  badge.textContent = state;
+  statusText.textContent = text || '';
+}
+
+function setRunning(b) {
+  running = b;
+  dryBtn.disabled = b;
+  writeBtn.disabled = b;
+  tabSel.disabled = b;
+  fromInput.disabled = b;
+  toInput.disabled = b;
+}
+
+async function loadTabs() {
+  try {
+    const r = await fetch('/tabs');
+    const data = await r.json();
+    if (!r.ok) throw new Error(data.error || 'tabs API error');
+    tabSel.innerHTML = '';
+    for (const t of data.tabs) {
+      const o = document.createElement('option');
+      o.value = t;
+      o.textContent = t;
+      tabSel.appendChild(o);
+    }
+    if (data.tabs.length === 0) {
+      setBadge('error', 'no tabs found in this sheet');
+    }
+  } catch (err) {
+    setBadge('error', 'failed to load tabs: ' + err.message);
+  }
+}
+
+function appendRow(e) {
+  const tr = document.createElement('tr');
+
+  let companyCell = `<div class="raw">${escapeHtml(e.company || '')}</div>`;
+  if (e.pickedName || e.cleaned) {
+    let pickedBits = '';
+    if (e.pickedINN) pickedBits += `<span class="inn">${escapeHtml(e.pickedINN)}</span>`;
+    if (e.pickedName) pickedBits += escapeHtml(e.pickedName);
+    else if (e.cleaned) pickedBits += '→ ' + escapeHtml(e.cleaned);
+    if (e.activeCount && e.allCount && e.allCount !== e.activeCount) {
+      pickedBits += ` <span style="color:#9ca3af">(${e.activeCount}/${e.allCount} active)</span>`;
+    }
+    companyCell += `<div class="picked">${pickedBits}</div>`;
+  }
+
+  let phoneCell;
+  if (e.phone) {
+    phoneCell = escapeHtml(e.phone);
+  } else if (e.currentH) {
+    phoneCell = `<span class="current-h">${escapeHtml(e.currentH)}</span>`;
+  } else {
+    phoneCell = '<span class="current-h">—</span>';
+  }
+
+  let actionCell = `<span class="action-tag ${e.action || ''}">${escapeHtml(e.action || '')}</span>`;
+  if (e.reason) {
+    actionCell += `<span class="reason">${escapeHtml(REASON_LABEL[e.reason] || e.reason)}</span>`;
+  }
+  if (e.error) {
+    actionCell += `<span class="reason">${escapeHtml(e.error)}</span>`;
+  }
+
+  tr.innerHTML = `
+    <td class="row-num">${e.sheetRow ?? ''}</td>
+    <td class="company">${companyCell}</td>
+    <td class="phone">${phoneCell}</td>
+    <td class="action">${actionCell}</td>
+  `;
+  results.appendChild(tr);
+  tr.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+}
+
+function renderSummary(e) {
+  const stats = [
+    ['Total rows',    e.total],
+    ['Written',       e.written],
+    ['Would write',   e.wouldWrite],
+    ['Skip: H full',  e.skippedHFull],
+    ['Skip: E empty', e.skippedEmpty],
+    ['Not found',     e.skippedNotFound],
+    ['Errors',        e.errors],
+  ];
+  summaryGrid.innerHTML = stats.map(([label, num]) =>
+    `<div class="stat"><div class="num">${num ?? 0}</div><div class="label">${escapeHtml(label)}</div></div>`
+  ).join('');
+  summary.classList.add('visible');
+}
+
+async function startJob(dryRun) {
+  if (running) return;
+
+  if (!tabSel.value) {
+    setBadge('error', 'pick a tab first');
+    return;
+  }
+  const from = parseInt(fromInput.value, 10);
+  const to   = parseInt(toInput.value, 10);
+  if (!Number.isInteger(from) || !Number.isInteger(to) || from < 1 || to < from) {
+    setBadge('error', 'invalid row range');
+    return;
+  }
+  if (to - from > 999) {
+    setBadge('error', 'max 1000 rows per job');
+    return;
+  }
+
+  results.innerHTML = '';
+  summary.classList.remove('visible');
+  setRunning(true);
+  setBadge('running', (dryRun ? 'Dry-run' : 'WRITE') + ' is running… (~3-4 sec per row)');
+
+  let res, body;
+  try {
+    res = await fetch('/run', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ tab: tabSel.value, fromRow: from, toRow: to, dryRun })
+    });
+    body = await res.json();
+  } catch (err) {
+    setBadge('error', err.message);
+    setRunning(false);
+    return;
+  }
+  if (!res.ok) {
+    setBadge('error', body.error || ('HTTP ' + res.status));
+    setRunning(false);
+    return;
+  }
+
+  if (eventSource) eventSource.close();
+  eventSource = new EventSource('/events/' + encodeURIComponent(body.jobId));
+  eventSource.onmessage = ev => {
+    let data;
+    try { data = JSON.parse(ev.data); } catch { return; }
+    if (data.type === 'row') {
+      appendRow(data);
+    } else if (data.type === 'done') {
+      renderSummary(data);
+      const writtenMsg = dryRun
+        ? `Dry-run finished. ${data.wouldWrite || 0} rows would be written. Nothing was written.`
+        : `Write finished. ${data.written || 0} cells updated.`;
+      setBadge('done', writtenMsg);
+      setRunning(false);
+    } else if (data.type === 'error') {
+      setBadge('error', data.error);
+      setRunning(false);
+    }
+  };
+  eventSource.addEventListener('end', () => {
+    if (eventSource) { eventSource.close(); eventSource = null; }
+    setRunning(false);
+  });
+  eventSource.onerror = () => {
+    if (running) setBadge('error', 'connection lost');
+    setRunning(false);
+    if (eventSource) { eventSource.close(); eventSource = null; }
+  };
+}
+
+dryBtn.onclick = () => startJob(true);
+writeBtn.onclick = () => {
+  const msg =
+    `About to WRITE to Google Sheets:\n` +
+    `   tab: ${tabSel.value}\n` +
+    `   rows: ${fromInput.value} → ${toInput.value}\n\n` +
+    `Only empty cells in column H will be filled.\n` +
+    `Existing values are never touched.\n\n` +
+    `Continue?`;
+  if (confirm(msg)) startJob(false);
+};
+
+loadTabs();
+</script>
+</body>
+</html>

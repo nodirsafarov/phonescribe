@@ -1,0 +1,16 @@
+# Secrets — NEVER commit
+credentials.json
+token.json
+.env
+
+# Build artifacts
+phonescribe
+logistikila
+*.exe
+*.test
+*.out
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
